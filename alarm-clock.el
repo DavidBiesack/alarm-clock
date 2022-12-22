@@ -103,6 +103,8 @@
   (define-key alarm-clock-mode-map "-" 'alarm-clock-kill)
   (define-key alarm-clock-mode-map "g" 'alarm-clock-list-view)
   (define-key alarm-clock-mode-map " " 'alarm-clock-stop)
+  (define-key alarm-clock-mode-map "S" 'alarm-clock-save)
+  (define-key alarm-clock-mode-map "R" 'alarm-clock-restore)
   )
 
 ;;;###autoload

@@ -59,7 +59,7 @@
   :group 'alarm-clock)
 
 (defcustom alarm-clock-play-auto-view-alarms nil
-  "If non-nul, display the alarm clock list when ringing an alarm, to allow using SPACE to run alarm-clock-stop"
+  "If non-nil, display the alarm clock list when ringing an alarm, to allow using SPACE to run alarm-clock-stop"
   :type 'boolean
   :group 'alarm-clock)
 

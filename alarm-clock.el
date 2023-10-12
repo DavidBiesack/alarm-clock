@@ -125,18 +125,30 @@ raise an error rather than schedule an alarm that will trigger immediately."
   (unless (timer-duration time)
     ;; time parsing swiped from timer.el run-at-time function in Emacs 27.1
     (require 'diary-lib)
-    (let ((hhmm (diary-entry-time time))
-	  (now (decode-time))
-          then)
-      (wnen (>= hhmm 0)
-	    (setq then
-		  (encode-time 0 (% hhmm 100) (/ hhmm 100)
-                               (decoded-time-day now)
-			       (decoded-time-month now)
-                               (decoded-time-year now)
-                               (decoded-time-zone now)))
-            (and (time-less-p (decode-time then) now)
-                 (error "Time is in the past. Try again")))))
+    (let* ((hhmm (diary-entry-time time))
+           (hh (/ hhmm 100))
+           (mm (% hhmm 100))
+	   (now (decode-time))
+           (hh-now (decoded-time-hour now))
+           (mm-now (decoded-time-minute now))
+           then)
+      (when (>= hhmm 0)
+	;; (setq then (decode-time (encode-time 0
+        ;;                                      (% hhmm 100)
+        ;;                                      (/ hhmm 100)
+        ;;                                      (decoded-time-day now)
+	;; 		                        (decoded-time-month now)
+        ;;                                      (decoded-time-year now)
+        ;;                                      (decoded-time-zone now))))
+        ;; (message "event time %s" then)
+        ;; (message "now        %s" now)
+        ;; time-less-p seems to not work... so compare hh and mm fields
+        ;; (and (time-less-p then nil) ;; nil is current time
+        ;;       (error "Time is in the past. Try again")))))
+        (if (or (< hh hh-now)
+                (and (= hh hh-now)
+                     (< mm mm-now)))
+            (error "Time is in the past. Try again")))))
   time
   )
 

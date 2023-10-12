@@ -117,12 +117,35 @@ Auto-save the alarms if alarm-clock-auto-save is true."
   (alarm-clock--list-prepare)
   (alarm-clock--maybe-auto-save))
 
+(defun alarm-clock--validate-time (time)
+  "Parse and validate an alarm clock TIME. If TIME is an absolute time
+such as \"1:00\" that is in the past (for example, when \"1:00pm\" was meant),
+raise an error rather than schedule an alarm that will trigger immediately."
+  (setq time (if (stringp time) (string-trim time) time))
+  (unless (timer-duration time)
+    ;; time parsing swiped from timer.el run-at-time function in Emacs 27.1
+    (require 'diary-lib)
+    (let ((hhmm (diary-entry-time time))
+	  (now (decode-time))
+          then)
+      (wnen (>= hhmm 0)
+	    (setq then
+		  (encode-time 0 (% hhmm 100) (/ hhmm 100)
+                               (decoded-time-day now)
+			       (decoded-time-month now)
+                               (decoded-time-year now)
+                               (decoded-time-zone now)))
+            (and (time-less-p (decode-time then) now)
+                 (error "Time is in the past. Try again")))))
+  time
+  )
+
 (defun alarm-clock--set (time message)
   "Set an alarm clock at time TIME.
 TIME is specified as with the run-at-time function.
 MESSAGE will be shown when notifying in the status bar."
   (interactive "sAlarm at (e.g: 10:00am, 2 minutes, 30 seconds): \nsMessage: ")
-  (let* ((time (if (stringp time) (string-trim time) time))
+  (let* ((time (alarm-clock--validate-time time))
          (message (string-trim message))
          (timer (run-at-time
                  time

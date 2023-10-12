@@ -59,7 +59,7 @@
   :group 'alarm-clock)
 
 (defcustom alarm-clock-play-auto-view-alarms nil
-  "If non-nul, display the alarm clock list when ringing an alarm, to allow using SPACE to run alarm-clock-stop"
+  "If non-nil, display the alarm clock list when ringing an alarm, to allow using SPACE to run alarm-clock-stop"
   :type 'boolean
   :group 'alarm-clock)
 
@@ -103,6 +103,8 @@
   (define-key alarm-clock-mode-map "-" 'alarm-clock-kill)
   (define-key alarm-clock-mode-map "g" 'alarm-clock-list-view)
   (define-key alarm-clock-mode-map " " 'alarm-clock-stop)
+  (define-key alarm-clock-mode-map "S" 'alarm-clock-save)
+  (define-key alarm-clock-mode-map "R" 'alarm-clock-restore)
   )
 
 ;;;###autoload
@@ -115,11 +117,47 @@ Auto-save the alarms if alarm-clock-auto-save is true."
   (alarm-clock--list-prepare)
   (alarm-clock--maybe-auto-save))
 
+(defun alarm-clock--validate-time (time)
+  "Parse and validate an alarm clock TIME. If TIME is an absolute time
+such as \"1:00\" that is in the past (for example, when \"1:00pm\" was meant),
+raise an error rather than schedule an alarm that will trigger immediately."
+  (setq time (if (stringp time) (string-trim time) time))
+  (unless (timer-duration time)
+    ;; time parsing swiped from timer.el run-at-time function in Emacs 27.1
+    (require 'diary-lib)
+    (let* ((hhmm (diary-entry-time time))
+           (hh (/ hhmm 100))
+           (mm (% hhmm 100))
+	   (now (decode-time))
+           (hh-now (decoded-time-hour now))
+           (mm-now (decoded-time-minute now))
+           then)
+      (when (>= hhmm 0)
+	;; (setq then (decode-time (encode-time 0
+        ;;                                      (% hhmm 100)
+        ;;                                      (/ hhmm 100)
+        ;;                                      (decoded-time-day now)
+	;; 		                        (decoded-time-month now)
+        ;;                                      (decoded-time-year now)
+        ;;                                      (decoded-time-zone now))))
+        ;; (message "event time %s" then)
+        ;; (message "now        %s" now)
+        ;; time-less-p seems to not work... so compare hh and mm fields
+        ;; (and (time-less-p then nil) ;; nil is current time
+        ;;       (error "Time is in the past. Try again")))))
+        (if (or (< hh hh-now)
+                (and (= hh hh-now)
+                     (< mm mm-now)))
+            (error "Time is in the past. Try again")))))
+  time
+  )
+
 (defun alarm-clock--set (time message)
   "Set an alarm clock at time TIME.
+TIME is specified as with the run-at-time function.
 MESSAGE will be shown when notifying in the status bar."
   (interactive "sAlarm at (e.g: 10:00am, 2 minutes, 30 seconds): \nsMessage: ")
-  (let* ((time (if (stringp time) (string-trim time) time))
+  (let* ((time (alarm-clock--validate-time time))
          (message (string-trim message))
          (timer (run-at-time
                  time

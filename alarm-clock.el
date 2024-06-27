@@ -69,7 +69,7 @@
   :group 'alarm-clock)
 
 (defcustom alarm-clock-cache-file
-  (expand-file-name ".alarm-clock.cache" user-emacs-directory)
+  (expand-file-name ".alarm-clock.cache" user-emacs-directory) ;; ~/.emacs.d/.alarm-clock.cache
   "The name of alarm-clock's cache file."
   :type 'string
   :group 'alarm-clock)
@@ -122,7 +122,7 @@ Auto-save the alarms if alarm-clock-auto-save is true."
 such as \"1:00\" that is in the past (for example, when \"1:00pm\" was meant),
 raise an error rather than schedule an alarm that will trigger immediately."
   (setq time (if (stringp time) (string-trim time) time))
-  (unless (timer-duration time)
+  (unless (or (listp time) (timer-duration time))
     ;; time parsing swiped from timer.el run-at-time function in Emacs 27.1
     (require 'diary-lib)
     (let* ((hhmm (diary-entry-time time))
@@ -218,6 +218,8 @@ MESSAGE will be shown when notifying in the status bar."
   "Stop sounding the current alarm."
   (interactive)
   (setq alarm-clock--stopped t)
+  (alarm-clock--remove-expired)
+  (alarm-clock--maybe-auto-save)
   (message "Alarm stopped.")
   )
 
@@ -296,6 +298,7 @@ and 'mpg123' in linux"
     (alarm-clock--ding))
   (when alarm-clock-system-notify
     (alarm-clock--system-notify title message))
+  (alarm-clock--maybe-auto-save)
   (message (format "[%s] - %s" title message)))
 
 ;;;###autoload
@@ -328,7 +331,7 @@ and 'mpg123' in linux"
   (interactive)
   (let ((alarm-clocks (alarm-clock--formatted-cache)))
     (with-current-buffer (find-file-noselect alarm-clock-cache-file)
-      (kill-region (point-min) (point-max))
+      (delete-region (point-min) (point-max))
       (insert ";; Auto-generated file; don't edit\n")
       (pp alarm-clocks (current-buffer))
       (save-buffer) ; use save-buffer so we get a ~ backup file

@@ -42,7 +42,7 @@
 
 (defcustom alarm-clock-sound-file
   (concat
-   (file-name-directory (or load-file-name buffer-file-name))
+   (file-name-directory (locate-library "alarm-clock"))
    "alarm.mp3")
   "File to play the alarm sound."
   :type 'file
@@ -257,6 +257,8 @@ In osx operating system, 'afplay' will be used to play sound,
 and 'mpg123' in linux"
   (let ((program (cond ((eq system-type 'darwin) "afplay")
                        ((eq system-type 'gnu/linux) "mpg123")
+                       ((eq system-type 'windows-nt) "mpg123")
+                       ((eq system-type 'cygwin) "mpg123")
                        (t "")))
         (sound (expand-file-name alarm-clock-sound-file)))
     (when (and (executable-find program)

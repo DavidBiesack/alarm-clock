@@ -42,7 +42,7 @@
 
 (defcustom alarm-clock-sound-file
   (concat
-   (file-name-directory (or load-file-name buffer-file-name))
+   (file-name-directory (locate-library "alarm-clock"))
    "alarm.mp3")
   "File to play the alarm sound."
   :type 'file
@@ -69,7 +69,7 @@
   :group 'alarm-clock)
 
 (defcustom alarm-clock-cache-file
-  (expand-file-name ".alarm-clock.cache" user-emacs-directory)
+  (expand-file-name ".alarm-clock.cache" user-emacs-directory) ;; ~/.emacs.d/.alarm-clock.cache
   "The name of alarm-clock's cache file."
   :type 'string
   :group 'alarm-clock)
@@ -122,7 +122,7 @@ Auto-save the alarms if alarm-clock-auto-save is true."
 such as \"1:00\" that is in the past (for example, when \"1:00pm\" was meant),
 raise an error rather than schedule an alarm that will trigger immediately."
   (setq time (if (stringp time) (string-trim time) time))
-  (unless (timer-duration time)
+  (unless (or (listp time) (timer-duration time))
     ;; time parsing swiped from timer.el run-at-time function in Emacs 27.1
     (require 'diary-lib)
     (let* ((hhmm (diary-entry-time time))
@@ -131,20 +131,8 @@ raise an error rather than schedule an alarm that will trigger immediately."
 	   (now (decode-time))
            (hh-now (decoded-time-hour now))
            (mm-now (decoded-time-minute now))
-           then)
+           )
       (when (>= hhmm 0)
-	;; (setq then (decode-time (encode-time 0
-        ;;                                      (% hhmm 100)
-        ;;                                      (/ hhmm 100)
-        ;;                                      (decoded-time-day now)
-	;; 		                        (decoded-time-month now)
-        ;;                                      (decoded-time-year now)
-        ;;                                      (decoded-time-zone now))))
-        ;; (message "event time %s" then)
-        ;; (message "now        %s" now)
-        ;; time-less-p seems to not work... so compare hh and mm fields
-        ;; (and (time-less-p then nil) ;; nil is current time
-        ;;       (error "Time is in the past. Try again")))))
         (if (or (< hh hh-now)
                 (and (= hh hh-now)
                      (< mm mm-now)))
@@ -198,18 +186,21 @@ MESSAGE will be shown when notifying in the status bar."
   (alarm-clock--remove-expired)
   (set-buffer (get-buffer-create "*alarm clock*"))
   (alarm-clock-mode)
-  (let* ((format "%-20s %-12s   %s")
+  (let* ((line-format "%-10s %-10s  %-12s   %s")
          (inhibit-read-only t) )
     (erase-buffer)
-    (setq header-line-format (format format " Time" " Remaining" " Message"))
+    ;; Set the fringe style to 0 (no fringe) so that column labels line up with alarm lines
+    (set-fringe-style 0)
+    (setq header-line-format (format line-format "Date" "Time" "Remaining" "Event"))
     (dolist (alarm (alarm-clock--sort-list))
       (let* ((alarm-time (plist-get alarm :time))
              (alarm-message (plist-get alarm :message))
              ;; I think alarms are removed from the list when they fire, so no negative remaining values
              (remaining (format-time-string "%H:%2M:%2S" (time-subtract alarm-time nil) 0) )
              (start (point))
-             (time (format-time-string "%F %X" alarm-time)))
-        (insert (format format time remaining alarm-message) "\n")
+             (date (format-time-string "%F" alarm-time))
+             (time (format-time-string "%X" alarm-time)))
+        (insert (format line-format date time remaining alarm-message) "\n")
         (put-text-property start (1+ start) 'alarm-clock alarm))
       (goto-char (point-min)))))
 
@@ -218,6 +209,8 @@ MESSAGE will be shown when notifying in the status bar."
   "Stop sounding the current alarm."
   (interactive)
   (setq alarm-clock--stopped t)
+  (alarm-clock--remove-expired)
+  (alarm-clock--maybe-auto-save)
   (message "Alarm stopped.")
   )
 
@@ -264,6 +257,8 @@ In osx operating system, 'afplay' will be used to play sound,
 and 'mpg123' in linux"
   (let ((program (cond ((eq system-type 'darwin) "afplay")
                        ((eq system-type 'gnu/linux) "mpg123")
+                       ((eq system-type 'windows-nt) "mpg123")
+                       ((eq system-type 'cygwin) "mpg123")
                        (t "")))
         (sound (expand-file-name alarm-clock-sound-file)))
     (when (and (executable-find program)
@@ -296,6 +291,7 @@ and 'mpg123' in linux"
     (alarm-clock--ding))
   (when alarm-clock-system-notify
     (alarm-clock--system-notify title message))
+  (alarm-clock--maybe-auto-save)
   (message (format "[%s] - %s" title message)))
 
 ;;;###autoload
@@ -328,7 +324,7 @@ and 'mpg123' in linux"
   (interactive)
   (let ((alarm-clocks (alarm-clock--formatted-cache)))
     (with-current-buffer (find-file-noselect alarm-clock-cache-file)
-      (kill-region (point-min) (point-max))
+      (delete-region (point-min) (point-max))
       (insert ";; Auto-generated file; don't edit\n")
       (pp alarm-clocks (current-buffer))
       (save-buffer) ; use save-buffer so we get a ~ backup file
